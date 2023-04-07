@@ -22,7 +22,6 @@ public class DungeonGenerator {
             Vector point = null;
 
             for (Vector possiblePoint : dungeon.keySet()) {
-                Bukkit.broadcastMessage("Possible point: " + possiblePoint);
                 Room room = dungeon.get(possiblePoint);
                 if(room == null)
                     continue;
@@ -46,33 +45,30 @@ public class DungeonGenerator {
                 continue;
 
             RandomCollection<Direction> randomCollection = new RandomCollection<>();
-            List<Direction> possibleDirections = new ArrayList<>(dungeon.get(point).getDirections());
-            List<Direction> possibleBlockedDirections = new ArrayList<>();
-            List<Direction> removedDirections = new ArrayList<>();
+            LinkedList<Direction> possibleDirections = new LinkedList<>(dungeon.get(point).getDirections());
+            LinkedList<Direction> possibleBlockedDirections = new LinkedList<>();
+            LinkedList<Direction> removedDirections = new LinkedList<>();
 
             if(possibleDirections.isEmpty())
                 continue;
 
-            for(Direction possibleDirection : possibleDirections){
-                try{
+            for(Direction possibleDirection : possibleDirections) {
+
                 Vector possiblePoint = new Vector(point.getBlockX() + possibleDirection.getX(),
                                                   point.getBlockY() + possibleDirection.getY(),
                                                   point.getBlockZ() + possibleDirection.getZ());
-                if(dungeon.containsKey(possiblePoint) && !removedDirections.contains(possibleDirection)){
+                if (dungeon.containsKey(possiblePoint) && !removedDirections.contains(possibleDirection)) {
                     removedDirections.add(possibleDirection);
                     possibleBlockedDirections.add(possibleDirection);
                 }
-                }catch (ConcurrentModificationException e) {
-                    Bukkit.getLogger().warning(e.toString());
-                }
+
             }
 
             possibleDirections.removeAll(removedDirections);
             for(Direction possibleDirection : possibleDirections){
-                randomCollection.add(1.0/possibleBlockedDirections.size(), possibleDirection);
+                randomCollection.add(100.0/possibleBlockedDirections.size(), possibleDirection);
             }
 
-            Bukkit.broadcastMessage(randomCollection.getMap()+"");
             Direction direction = randomCollection.next();
             Vector newPoint = new Vector(point.getBlockX() + direction.getX(),
                                          point.getBlockY() + direction.getY(),
@@ -82,6 +78,7 @@ public class DungeonGenerator {
 
             point = null;
         }
+        DungeonUtils.fixRooms(dungeon);
 
         return dungeon;
     }

@@ -17,7 +17,7 @@ public class GenerateCommand implements CommandExecutor {
         if(!(commandSender instanceof Player p))
             return false;
 
-        HashMap<Vector, Room> rooms = DungeonGenerator.generateDungeon(30);
+        HashMap<Vector, Room> rooms = DungeonGenerator.generateDungeon(15);
         DungeonGenerator.pasteDungeon(rooms, p.getLocation());
         return false;
     }

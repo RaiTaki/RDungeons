@@ -1,6 +1,7 @@
 package xyz.raitaki.rdungeons.utils;
 
 import org.bukkit.Bukkit;
+import org.bukkit.util.Vector;
 import xyz.raitaki.rdungeons.RDungeons;
 import xyz.raitaki.rdungeons.dungeon.Direction;
 import xyz.raitaki.rdungeons.dungeon.Room;
@@ -167,6 +168,8 @@ public class DungeonUtils {
             }
             Room.addRoom(new Room(file.getName().replace(".schem", "").toLowerCase(), 0,0,0, isLift, directions));
 
+            if(isLift)
+                continue;
             for (int i = 1; i != 4; i++) {
                 List<Direction> newDirectionsX = rotateDirections(directions, i * 90, 0, 0);
                 List<Direction> newDirectionsY = rotateDirections(directions, 0, i * 90, 0);
@@ -175,17 +178,16 @@ public class DungeonUtils {
                 List<Direction> newDirectionsXZ = rotateDirections(directions, i * 90, 0, i * 90);
                 List<Direction> newDirectionsYZ = rotateDirections(directions, 0, i * 90, i * 90);
 
-                boolean finalIsLift = isLift;
                 List<Room> rooms = Room.getLoadedRooms();
 
-                if (rooms.stream().noneMatch(room -> room.getDirections().stream().sorted().toList().equals(newDirectionsX.stream().sorted().toList()) && finalIsLift == room.isLift())) {
-                    rooms.add(new Room(file.getName().replace(".schem", ""),i*90, 0, 0, isLift, newDirectionsX));
+                if (rooms.stream().noneMatch(room -> room.getDirections().stream().sorted().toList().equals(newDirectionsX.stream().sorted().toList()) && !room.isLift())) {
+                    rooms.add(new Room(file.getName().replace(".schem", ""),i*90, 0, 0, false, newDirectionsX));
                 }
-                if (rooms.stream().noneMatch(room -> room.getDirections().stream().sorted().toList().equals(newDirectionsY.stream().sorted().toList()) && finalIsLift == room.isLift())) {
-                    rooms.add(new Room(file.getName().replace(".schem", ""),0, i*90, 0, isLift, newDirectionsY));
+                if (rooms.stream().noneMatch(room -> room.getDirections().stream().sorted().toList().equals(newDirectionsY.stream().sorted().toList()) && !room.isLift())) {
+                    rooms.add(new Room(file.getName().replace(".schem", ""),0, i*90, 0, false, newDirectionsY));
                 }
-                if (rooms.stream().noneMatch(room -> room.getDirections().stream().sorted().toList().equals(newDirectionsZ.stream().sorted().toList()) && finalIsLift == room.isLift())) {
-                    rooms.add(new Room(file.getName().replace(".schem", ""),0, 0, i*90, isLift, newDirectionsZ));
+                if (rooms.stream().noneMatch(room -> room.getDirections().stream().sorted().toList().equals(newDirectionsZ.stream().sorted().toList()) && !room.isLift())) {
+                    rooms.add(new Room(file.getName().replace(".schem", ""),0, 0, i*90, false, newDirectionsZ));
                 }
             }
         }
@@ -238,6 +240,7 @@ public class DungeonUtils {
     public static Room getRandomRoom(List<Direction> possibleDirections, List<Direction> blockedDirections){
         List<Room> rooms = Room.getLoadedRooms();
         List<Room> possibleRooms = new ArrayList<>();
+
         for(Room room : rooms){
             if(room.isLift()){
                 continue;
@@ -250,8 +253,6 @@ public class DungeonUtils {
             }
         }
 
-        Bukkit.broadcastMessage("Possible rooms: " + possibleRooms.size());
-
         if(possibleRooms.size() == 0){
             return null;
         }
@@ -259,5 +260,79 @@ public class DungeonUtils {
             return possibleRooms.get(0);
         }
         return possibleRooms.get(new Random().nextInt(possibleRooms.size()));
+    }
+
+    public static Room getRandomRoom(int directionsAmount) {
+        RandomCollection<Room> randomCollection = new RandomCollection<>();
+
+        List<Room> possibleRooms = new ArrayList<>();
+        for (Room room : Room.getLoadedRooms()) {
+            if (room.getDirections().size() == directionsAmount) {
+                possibleRooms.add(room);
+            }
+        }
+
+        for (Room room : possibleRooms) {
+            randomCollection.add(possibleRooms.size()/100.0, room);
+        }
+
+        return randomCollection.next();
+    }
+
+    public static void fixRooms(HashMap<org.bukkit.util.Vector, Room> dungeon){
+        HashMap<org.bukkit.util.Vector, Room> toReplace = new HashMap<>();
+        for (Map.Entry<org.bukkit.util.Vector, Room> entry1 : dungeon.entrySet()) {
+            LinkedList<Direction> blockedDirections = new LinkedList<>();
+            LinkedList<Direction> directions = new LinkedList<>();
+            org.bukkit.util.Vector vector = entry1.getKey();
+            Room room;
+
+            for (Direction side : Direction.values()) {
+                if (dungeon.containsKey(new Vector((vector.getBlockX() + side.getX()) + side.getX(), (vector.getBlockY()+ side.getY()) + side.getY(), (vector.getBlockZ() + side.getZ()) + side.getZ()))) {
+                    if (!directions.contains(side)) {
+                        directions.add(side);
+                    }
+                }
+            }
+            for (Direction side : Direction.values()) {
+                if (!dungeon.containsKey(new Vector(vector.getBlockX() + side.getX(), vector.getBlockY() + side.getY(), vector.getBlockZ() + side.getZ()))) {
+                    if(!blockedDirections.contains(side))
+                        blockedDirections.add(side);
+                }
+            }
+
+            directions.addAll(Arrays.stream(Direction.values()).toList().stream().filter(direction -> !blockedDirections.contains(direction)).toList());
+            directions.removeIf(blockedDirections::contains);
+
+            LinkedList<Direction> finalDirections = removeDuplicates(directions);
+            try {
+
+                room = Room.getLoadedRooms().stream().filter(possibleRoom -> new HashSet<>(possibleRoom.getDirections()).containsAll(finalDirections) && possibleRoom.getDirections().stream().noneMatch(blockedDirections::contains)).findAny().get();
+                toReplace.put(vector, room);
+            }catch (Exception e) {
+                System.out.println(TextUtil.getColored("&6Could not find room with directions: " + finalDirections));
+            }
+        }
+        toReplace.forEach(dungeon::replace);
+    }
+
+    public static <T> LinkedList<T> removeDuplicates(LinkedList<T> list) {
+
+        // Create a new ArrayList
+        LinkedList<T> newList = new LinkedList<T>();
+
+        // Traverse through the first list
+        for (T element : list) {
+
+            // If this element is not present in newList
+            // then add it
+            if (!newList.contains(element)) {
+
+                newList.add(element);
+            }
+        }
+
+        // return the new list
+        return newList;
     }
 }
