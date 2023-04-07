@@ -1,0 +1,6 @@
+name: RDungeons
+version: '${project.version}'
+main: xyz.raitaki.rdungeons.RDungeons
+api-version: 1.19
+commands:
+  generateDungeon:
